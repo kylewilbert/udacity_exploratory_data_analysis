@@ -1,0 +1,506 @@
+Prosper Loan: Exploratory Data Analysis by Kyle Wilbert
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+library(tidyverse) # all things tidy
+library(RColorBrewer) # color palettes
+library(lubridate) # help with date manipulation
+```
+
+```{r include=FALSE, Load_the_Data}
+# Load the Data
+loans <- read.csv('prosperLoanData.csv')
+
+# show dimensions of dataset
+dim(loans)
+
+# view first few rows to confirm correct load
+head(loans)
+
+# view column names
+names(loans)
+
+# confirm structure of data
+str(loans)
+
+# convert dates using lubridate
+loans$LoanOriginationDate <- as_date(loans$LoanOriginationDate)
+
+# create select set of data with fewer variables (21 total variables)
+keep_vars <- c("LoanStatus", "LoanOriginationDate", "LoanOriginationQuarter",
+               "LoanOriginalAmount", "Term", "ClosedDate",
+               "LenderYield", 
+               "LoanCurrentDaysDelinquent", 
+               "RevolvingCreditBalance", "BorrowerRate", 
+               "ProsperRating..Alpha.", 
+               "BorrowerState", "EmploymentStatus", 
+               "EmploymentStatusDuration", "DebtToIncomeRatio",
+               "IncomeRange")
+loans2 <-loans[keep_vars]
+
+names(loans2)
+
+
+```
+
+# Univariate Plots Section
+
+```{r echo=FALSE, Univariate_Plots}
+# show dimensions of dataset
+dim(loans2)
+
+# reveal structore of loans2
+str(loans2)
+
+# summarize loans2
+summary(loans2)
+```
+
+```{r echo=FALSE}
+# view histogram of LoanStatus
+summary(loans2$LoanStatus)
+qplot(data = loans2, x = LoanStatus)
+```
+Will need to define Cancelled, Charged-Off, and Defaulted, 
+to accurately analyze loss. 
+Seems like a fairly large amount of chargeoffs (A charge-off or chargeoff is 
+the declaration by a creditor (usually a credit card account) that an amount 
+of debt is unlikely to be collected. This occurs when a consumer becomes 
+severely delinquent on a debt. Traditionally, creditors will make this 
+declaration at the point of six months without payment. 
+A charge-off is a form of write-off. 
+Source: Wikipedia https://en.wikipedia.org/wiki/Charge-off)
+```{r echo=FALSE}
+# check order of factors
+levels(loans2$LoanOriginationQuarter)
+loans2$LoanOriginationQuarter <- factor(loans2$LoanOriginationQuarter, 
+                                        levels = 
+                                          c("Q4 2005", "Q1 2006", "Q2 2006",
+                                            "Q3 2006", "Q4 2006", "Q1 2007",
+                                            "Q2 2007", "Q3 2007", "Q4 2007",
+                                            "Q1 2008", "Q2 2008", "Q3 2008",
+                                            "Q4 2008", "Q2 2009", "Q3 2009", 
+                                            "Q4 2009", "Q1 2010", "Q2 2010", 
+                                            "Q3 2010", "Q4 2010", "Q1 2011",
+                                            "Q2 2011", "Q3 2011", "Q4 2011",
+                                            "Q1 2012", "Q2 2012", "Q3 2012",
+                                            "Q4 2012", "Q1 2013", "Q2 2013",
+                                            "Q3 2013", "Q4 2013", "Q1 2014"))
+
+# view histogram of loans by quarter
+qplot(data = loans2, x = LoanOriginationQuarter)
+
+loans2 %>% count(LoanOriginationQuarter)
+```
+Q1 2009 is missing and Q2 2009 is smaller than Q4 2005 when it appears loans starte to be made originally. 
+
+Source: https://www.lendacademy.com/prosper-review/
+```{r echo=FALSE}
+# view histogram of LoanOriginalAmount
+summary(loans$LoanOriginalAmount)
+qplot(data = loans2, x=LoanOriginalAmount, binwidth = 50) +
+  scale_x_continuous(limits = c(0,25000), breaks = seq(0, 25000, 2500))
+```
+Showing the LoanOriginalAmount width a "skinny" binwidth of 50 reveals that
+most loans are originated with a round number ending in 5 or 0, as indicated 
+by the spikes.
+
+```{r echo=FALSE}
+# view histogram of Term
+qplot(data = loans2, x = Term, binwidth = 12) +
+  scale_x_continuous(limits = c(0,72), breaks = seq(0, 60, 12))
+```
+The most popular loan term is 36 months (3 years) followed by 
+6o months (5 years).
+```{r echo=FALSE}
+# view histogram of LoanCurrentDaysDelinquent
+summary(loans2$LoanCurrentDaysDelinquent)
+qplot(data = loans2, x = LoanCurrentDaysDelinquent, binwidth = 15) +
+  scale_x_continuous(limits = c(30,3000), breaks = seq(30, 3000, 90))
+```
+
+```{r echo=FALSE}
+# view histogram of RevolvingCreditBalance
+summary(loans2$RevolvingCreditBalance)
+qplot(x = RevolvingCreditBalance, data = loans2) +
+  scale_x_continuous(limits = c(0,100000), breaks = seq(0,100000,10000))
+
+```
+
+```{r echo=FALSE}
+# view histogram of BorrowerRate
+summary(loans2$BorrowerRate)
+qplot(data = loans2, x = BorrowerRate, binwidth = 0.01)
+```
+There is somewhat of a binomial distribution - the first between 0.15 
+and the other around 0.32. Correlated with DebttoIncome ratio?
+
+```{r echo=FALSE}
+# view histogram of BorrowerState
+summary(loans2$BorrowerState)
+
+loans2 <- within(loans2, 
+                 BorrowerState <- factor(BorrowerState,
+                                           levels=names(sort(table(BorrowerState)))))
+ggplot(loans2, aes(x = BorrowerState)) +
+  geom_bar(stat="count") +
+  coord_flip()
+
+# source: https://stackoverflow.com/questions/5208679/order-bars-in-ggplot2-bar-graph?noredirect=1&lq=1
+```
+The top 5 states originating loans were California, Texas, New York, Florida, 
+and Illinois. These states have the largest cities and the largest markets. 
+Also, I'd imagine Prosper targeting these markets with marketing campaigns.
+
+```{r echo=FALSE}
+# view histogram of EmploymentStatus
+qplot(data = loans2, x = EmploymentStatus)
+```
+The EmploymentStatus variable is problematic. It does not appear that Full-Time, 
+Self-Employed, and Part-Time, are a part of the Employed number. Rather than 
+being subcategories they were originally coded as separate categories. As-is, 
+it's not a very useful variable for measuring risk in this analysis.
+
+```{r echo=FALSE}
+# view histogram of EmploymentStatusDuration
+summary(loans2$EmploymentStatusDuration)
+qplot(data = loans2, x = EmploymentStatusDuration, binwidth = 5)
+```
+This is an odd variable too, as it could apply to employment or unemployment. 
+So we need to look at this variable with EmploymentStatus for this to be useful.
+
+```{r echo=FALSE}
+# view histogram of DebtToIncomeRatio
+qplot(data = loans2, x = DebtToIncomeRatio, binwidth = 0.1) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.1)) +
+  geom_vline(xintercept = 0.43, color = "red")
+```
+According to the CFBP, 43% is the highest debt-to-income ratio where borrowers 
+can still qualify for a mortgage. it appears the bulk of borrowers are below 
+that ratio (red line above). 
+Source: https://www.consumerfinance.gov/ask-cfpb/what-is-a-debt-to-income-ratio-why-is-the-43-debt-to-income-ratio-important-en-1791/
+
+```{r echo=FALSE}
+# reorder factor
+loans2$IncomeRange <- factor(loans2$IncomeRange, levels = c("$0", "$1-24,999",
+                                                            "$25,000-49,999",
+                                                            "$50,000-74,999",
+                                                            "$75,000-99,999",
+                                                            "$100,000+",
+                                                            "Not displayed",
+                                                            "Not employed"))
+
+# view histogram of IncomeRange
+qplot(data = loans2, x = IncomeRange)
+
+```
+The data for income range appears to be a more accurate measure 
+of employment and income than the EmploymentStatus variable.
+
+```{r echo=FALSE}
+# reorder factors
+loans2$ProsperRating..Alpha. <- factor(loans2$ProsperRating..Alpha., levels =
+                                          c("AA", "A", "B", "C", "D", "E", "HR"
+                                            ))
+
+# view histogram for ProsperRating (Alpha).
+qplot(data = loans2, x=ProsperRating..Alpha.)
+
+```
+29,084 are missing Alpha ratings.
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+There are 113,937 loans in the modified data set with 16 variables.
+
+Observations
+- the majority of loans have a 36 month term
+- most loans come from 5 states - CA, TX, NY, FL, IL
+- BorrowerRate appears to have a binomial distribution with peaks 
+around 15% and 32%
+- the majority of borrowers have Debt-to-Income ratios below 43%, 
+which is the highest rate allowed to receive a Qualified Mortgage
+
+Anomalies
+- ProsperRating..Alpha is missing 29,084 values. 
+Need to confirm that they are the same observations
+- IncomeRange has both \$0, not employed, and not displayed factors. What's the 
+difference between \$0 and not employed? I suppose if you are collecting 
+unemployment, your income would not be zero but you would be not employed. 
+But what about \$0 income?
+- EmploymentStatus is a really messy, unhelpful variable. The counts for 
+Full-Time, Part-Time, and Self-Employed are separate from the larger Employed 
+category.
+- EmploymentStatusDuration is equally as unhelpful because it relies on 
+EmploymentStatus. The duration can either be employed/unemployed 
+(or any of its subcategories).
+
+### What is/are the main feature(s) of interest in your dataset?
+I'm mostly curious about what distinguishes a healthy loan to an unhealthy loan. 
+To that end, I will look at LoanStatus, LoanOriginalAmount, 
+the Prosper Ratings, BorrowerState, 
+DebtToIncomeRatio, and IncomeRange.
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+see above
+
+### Did you create any new variables from existing variables in the dataset?
+I created Loan OriginationQtr to do some time series analysis
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+- both RevolvingCreditBalance and IncomeToDebtRatio have right-skewed 
+distributions. They look exponential.
+
+- otherwise, I tried using some tranforms on certain measures but they didn't
+apppear to transform the data much.
+
+
+# Bivariate Plots Section
+
+```{r echo=FALSE, Bivariate_Plots}
+# view boxplot of BorrowerRate against ProsperRating..Alpha
+qplot(x = ProsperRating..Alpha., y= BorrowerRate,
+      data = loans2,
+      geom = "boxplot")
+```
+- The borrowers without a ProsperRating have a wide distribution compared to the 
+borrowers with a rating - perhaps that's why Prosper developed a rating. 
+
+- There appears to be a positive linear between the best ratings (from best to worst, AA to HR) and lower interest rates.
+
+```{r echo=FALSE}
+# BorrowerRate over time
+ggplot(loans2) +
+  geom_jitter(aes(x = LoanOriginationQuarter, y = BorrowerRate), alpha = 1/100)
+```
+This shows an interesting picture of the business - pre-2009, there were fewer 
+distinct borrower rates. Prior to the gap quarter/reorganization, the 
+BorrowerRate widened. After the gap, there remained some high rate loans, but
+it appears they stopped doing higher rate loans in 2012. Most recently in 2014,
+you can see that they now use finer degrees of interest rates, likely based
+on their proprietary credit scoring models.
+
+```{r echo=FALSE}
+# calculate upper outliers
+summary(loans2$DebtToIncomeRatio) #3Q = 0.32
+IQR(loans2$DebtToIncomeRatio, na.rm = TRUE) # IQR = 0.18, 
+
+# view boxplot of DebtToIncomeRatio against PropserRating..Alpha
+qplot(data = subset(loans2, DebtToIncomeRatio < 0.59), 
+      x = ProsperRating..Alpha., y = DebtToIncomeRatio,
+      geom = "boxplot")
+```
+I removed any outliers in the DebtToIncomeRatio ((0.32) + 1.5(0.18)).
+From AA to C we see rising DebtToIncomeRatio as the Prosper Rating falls in
+quality. Past the C rating the trend disappears. There does appear to be a
+normal distribution of borrowers within each Prosper Rating, by
+Debt to Income ratio.
+
+```{r echo=FALSE}
+# view boxplot of DebtToIncomeRatio against IncomeRange
+qplot(data = subset(loans2, DebtToIncomeRatio < 1),
+      x = IncomeRange, y = DebtToIncomeRatio, 
+      geom = "boxplot")
+
+```
+As you might expect, there is a relationship between DebtToIncomeRatio
+and IncomeRange. As income rises, the ratio drops. 
+
+```{r echo=FALSE}
+# number of 
+by(loans2$LoanCurrentDaysDelinquent,loans2$BorrowerState, length)
+
+# view scatterplot of LoanCurrentDaysDelinquent against BorrowerState
+ggplot(aes(x = BorrowerState, y = LoanCurrentDaysDelinquent),
+      data = subset(loans2, loans2$LoanCurrentDaysDelinquent > 0)) +
+  geom_jitter(alpha = 1/20)
+```
+There are a surprising number of delinquincies without information about 
+origination state (rank:6). It looks like Prosper wasn't collecting enough data or lost
+some data at some point.
+
+```{r echo=FALSE}
+# summary
+by(loans2$EmploymentStatusDuration,loans2$EmploymentStatus, summary) 
+
+# scatterplot of EmploymentStatus vs EmploymentStatusDuration
+qplot(x = EmploymentStatus, y = EmploymentStatusDuration,
+      data = loans2,
+      geom = 'boxplot')
+```
+Oddly the medians for each category of employment are well less than 1 year 
+(96.07 for the category as a whole). Seems odd.
+Wonder if this is self-reported or based on credit agency data.
+
+```{r echo=FALSE}
+# boxplot of credit balance against rating
+qplot(x = ProsperRating..Alpha., y = RevolvingCreditBalance,
+      data = loans2,
+      geom = 'boxplot') +
+  scale_y_continuous(limits = c(0,45000))
+  
+```
+It appears that RevolvingCreditBalance also factors into the Prosper Rating.
+As ratings decrease, the median revolving credit also decreases. Also note
+that those with an A rating have a slightly higher median than those with a
+AA rating.
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+Covariation
+- RevolvingCreditBalance, DebtToIncomeRatio, and BorrowerRate all move parallel
+to the Prosper Rating, with BorrowerRate showing the most covariation
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+- shocking number of delinquencies without a BorrowerState recorded
+- EmploymentStatus and EmploymentStatusDuration does not appear to show strong
+pattern
+
+### What was the strongest relationship you found?
+The strongest relationship was between BorrowerRate and ProsperRating
+
+# Multivariate Plots Section
+
+> **Tip**: Now it's time to put everything together. Based on what you found in
+the bivariate plots section, create a few multivariate plots to investigate
+more complex interactions between variables. Make sure that the plots that you
+create here are justified by the plots you explored in the previous section. If
+you plan on creating any mathematical models, this is the section where you
+will do that.
+
+```{r echo=FALSE, Multivariate_Plots}
+# view BorrowerRate against LoanOrigination Quarter, color with Rating
+ggplot(aes(x = LoanOriginationQuarter, y = BorrowerRate, 
+                 color = ProsperRating..Alpha.),
+       data = loans2) +
+  geom_point() +
+  scale_color_brewer(type='qual') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# Source
+# https://stackoverflow.com/questions/1330989/rotating-and-spacing-axis-labels-in-ggplot2
+```
+The colors make clear here that pre-2009, there was no Prosper Rating, 
+hence no color. After the business rules reset in 2009, we start to see the
+implementation of Prosper Ratings. We also see that the better ratings
+receive more favorable borrowing rates.
+
+```{r echo=FALSE}
+# view BorrowerRate against LoanOriginationQuarter with IncomeRange color
+ggplot(aes(x = LoanOriginationQuarter, y = BorrowerRate, 
+                 color = IncomeRange),
+       data = loans2) +
+  geom_point() +
+  scale_color_brewer(type='qual') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+Not much of a pattern here - income is not a strong determinant of 
+borrower rate. There is some overplotting that I wasn't able to remove without
+also removing the color legend.
+```{r echo=FALSE}
+# x = LoanOriginationQuarter, y = LenderYield, color = ProsperRating..Alpha.
+
+ggplot(aes(x = LoanOriginationQuarter, y = LenderYield, 
+                 color = ProsperRating..Alpha.),
+       data = loans2) +
+  geom_point() +
+  scale_color_brewer(type='qual') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+Interesting - this chart looks very similar to the first multivariate chart
+we looked at. The difference, however, is that this shows the LenderYield
+is higher when they the investor funded riskier loans (based on Prosper Rating).
+Basically, there is an inverse relationship between a borrower's Prosper Rating
+and the lender's yield. High risk, high reward and vice versa.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+- The ProsperRating helps borrowers secure a lower rate while it is a signal to
+lender about which loans will be safe or risky. Safe loans have lower yields 
+than more risky loans.
+
+Borrowers benefit from a higher quality rating while lenders see more money
+from lower quality ratings.
+
+- Income is not a strong factor in determining borrower rate.
+### Were there any interesting or surprising interactions between features?
+It's not very surprising when I think about it but seeing the similarity
+between charts for borrower rate colored with Rating versus lender yield
+colored with Rating was amusing.
+
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+
+------
+
+# Final Plots and Summary
+
+> **Tip**: You've done a lot of exploration and have built up an understanding
+of the structure of and relationships between the variables in your dataset.
+Here, you will select three plots from all of your previous exploration to
+present here as a summary of some of your most interesting findings. Make sure
+that you have refined your selected plots for good titling, axis labels (with
+units), and good aesthetic choices (e.g. color, transparency). After each plot,
+make sure you justify why you chose each plot by describing what it shows.
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+
+```
+
+### Description One
+
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+
+```
+
+### Description Two
+
+
+### Plot Three
+```{r echo=FALSE, Plot_Three}
+
+```
+
+### Description Three
+
+------
+
+# Reflection
+
+> **Tip**: Here's the final step! Reflect on the exploration you performed and
+the insights you found. What were some of the struggles that you went through?
+What went well? What was surprising? Make sure you include an insight into
+future work that could be done with the dataset.
+
+> **Tip**: Don't forget to remove this, and the other **Tip** sections before
+saving your final work and knitting the final report!
